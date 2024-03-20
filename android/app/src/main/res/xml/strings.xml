@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">My App</string>
+    <string name="accessibility_service_description">Performs swipe actions based on user commands.</string>
+</resources>
