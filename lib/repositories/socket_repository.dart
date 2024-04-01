@@ -12,11 +12,11 @@ class SocketRepository {
     return _socketService.connectToSocket();
   }
 
-  void sendScreenshot(Uint8List byteList) {
+  void sendScreenshot(String byteList) {
     _socketService.sendScreenshot(byteList);
   }
 
-  void setScreenshotCallback(Function(Uint8List) callback) {
+  void setScreenshotCallback(Function(String) callback) {
     _socketService.setScreenshotCallback(callback);
   }
 }

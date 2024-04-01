@@ -16,18 +16,16 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.util.DisplayMetrics
-import android.util.Log
 import android.view.WindowManager
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
-import kotlinx.coroutines.flow.MutableSharedFlow
+import io.flutter.plugin.common.MethodChannel
 import java.nio.ByteBuffer
 
 class ScreenCaptureService : Service() {
 
     private val TAG = "ScreenCaptureService"
     private val INTERVAL = 1000L // Interval in milliseconds
-
     private lateinit var mediaProjectionManager: MediaProjectionManager
     private var mediaProjection: MediaProjection? = null
     private var windowManager: WindowManager? = null
@@ -106,21 +104,32 @@ class ScreenCaptureService : Service() {
 
     private fun captureScreen() {
         val image = imageReader?.acquireLatestImage()
+
         image?.let {
             val buffer: ByteBuffer = it.planes[0].buffer
             val bytes = ByteArray(buffer.remaining())
             buffer.get(bytes)
 
-            // Log a summary of the screenshot bytes
-            val byteSummary = "ScreenCaptureService Screenshot bytes size: ${bytes.size}"
-            Log.d(TAG, byteSummary)
+            val imageSize = bytes.size
+            println("Image size: $imageSize bytes")
 
-            // Send the screenshot data via a broadcast intent
-            val screenshotIntent = Intent("screenshot_event")
-            screenshotIntent.putExtra("screenshotData", bytes)
-            sendBroadcast(screenshotIntent)
-
+            sendScreenshot(bytes)
             it.close()
+        }
+    }
+
+    private fun sendScreenshot(screenshotData: ByteArray) {
+        val totalSize = screenshotData.size
+        val chunkSize = totalSize / 40 // Calculate the size of each chunk
+        var offset = 0
+
+        while (offset < totalSize) {
+            val chunkEnd = minOf(offset + chunkSize, totalSize)
+            val chunk = screenshotData.copyOfRange(offset, chunkEnd)
+            val isFirstChunk = offset == 0
+            val isLastChunk = chunkEnd == totalSize
+            MethodChannelSender.sendScreenshotData(chunk, isFirstChunk, isLastChunk)
+            offset += chunkSize
         }
     }
 
@@ -163,7 +172,19 @@ class ScreenCaptureService : Service() {
     }
 }
 
-object ScreenshotEventBus {
-    val screenshotFlow = MutableSharedFlow<ByteArray>()  // Define a shared flow to emit screenshot data
+object MethodChannelSender {
+    private var methodChannel: MethodChannel? = null
+
+    fun setMethodChannel(channel: MethodChannel) {
+        methodChannel = channel
+    }
+
+    fun sendScreenshotData(chunk: ByteArray, isFirstChunk: Boolean = false, isLastChunk: Boolean = false) {
+        val startMarker = if (isFirstChunk) "<start>" else ""
+        val endMarker = if (isLastChunk) "<end>" else ""
+        val message = "$startMarker${chunk.decodeToString()}$endMarker"
+        methodChannel?.invokeMethod("receiveScreenshotData", message)
+    }
+
 }
 

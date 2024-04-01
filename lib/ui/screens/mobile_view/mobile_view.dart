@@ -36,7 +36,7 @@ class _MobileViewState extends State<MobileView> {
       // ),
     );
   }
-  //'http://192.168.0.102:3000'
+  //'http://192.168.100.2:3000'
   void connectToSocket() {
     socket = IO.io('http://localhost:3000', <String, dynamic>{
       'transports': ['websocket'],

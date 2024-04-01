@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.media.projection.MediaProjectionManager
 import android.os.Build
+import android.os.Bundle
 import android.service.controls.ControlsProviderService.TAG
 import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
@@ -12,19 +13,35 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugins.GeneratedPluginRegistrant
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
+import java.io.ByteArrayOutputStream
 
 
 class MainActivity: FlutterActivity() {
     private var REQUEST_CODE_SCREEN_CAPTURE = 101
     private val mainScope = MainScope()
     private val CHANNEL_SCREENSHOT = "screenshot_event_channel"
+    private var screenshotEventSink: EventChannel.EventSink? = null
+    private lateinit var methodChannel: MethodChannel
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        GeneratedPluginRegistrant.registerWith(FlutterEngine(this))
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "capture_screenshot_channel")
-                .setMethodCallHandler { call: MethodCall, result: MethodChannel.Result ->
+
+        methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "capture_screenshot_channel")
+        MethodChannelSender.setMethodChannel(methodChannel)
+
+        methodChannel.setMethodCallHandler { call: MethodCall, result: MethodChannel.Result ->
                     if (call.method == "startScreenSharing") {
                         startForegroundServiceForScreenSharing()
                         result.success(null)
@@ -32,13 +49,11 @@ class MainActivity: FlutterActivity() {
                         result.notImplemented()
                     }
                 }
-        // Register the broadcast receiver to receive screenshot data
-        val filter = IntentFilter("screenshot_event")
-        registerReceiver(broadcastReceiver, filter)
 
     }
 
     private fun startForegroundServiceForScreenSharing() {
+        println("MainActivity: startForegroundServiceForScreenSharing")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             val mediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             startActivityForResult(mediaProjectionManager.createScreenCaptureIntent(), REQUEST_CODE_SCREEN_CAPTURE)
@@ -50,6 +65,7 @@ class MainActivity: FlutterActivity() {
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        println("MainActivity: onActivityResult")
         super.onActivityResult(requestCode, resultCode, data)
         // Forward the result to the service
         val serviceIntent = Intent(this, ScreenCaptureService::class.java).apply {
@@ -63,15 +79,6 @@ class MainActivity: FlutterActivity() {
             startForegroundService(serviceIntent)
         } else {
             startService(serviceIntent)
-        }
-    }
-
-    private val broadcastReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            // Handle the received screenshot data
-            val screenshotData = intent?.getByteArrayExtra("screenshotData")
-            Log.d(TAG, "MainActivity Screenshot bytes size: ${screenshotData?.size}")
-            // Update UI with the screenshot data
         }
     }
 

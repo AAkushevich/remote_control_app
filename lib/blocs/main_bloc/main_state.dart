@@ -1,23 +1,28 @@
 import 'dart:typed_data';
 
 class MainState {
-  final ConnectionStatus status;
+  final ConnectionStatus connectionStatus;
+  final ScreenShareStatus screenShareStatus;
   final Uint8List screenshotBytes;
 
   const MainState({
-    this.status = ConnectionStatus.notConnected,
+    this.connectionStatus = ConnectionStatus.notConnected,
+    this.screenShareStatus = ScreenShareStatus.offline,
     required this.screenshotBytes,
   });
 
   MainState copyWith({
-    ConnectionStatus? status,
+    ConnectionStatus? connectionStatus,
+    ScreenShareStatus? screenShareStatus,
     Uint8List? screenshotBytes,
   }) {
     return MainState(
-      status: status ?? this.status,
+      connectionStatus: connectionStatus ?? this.connectionStatus,
+      screenShareStatus: screenShareStatus ?? this.screenShareStatus,
       screenshotBytes: screenshotBytes ?? this.screenshotBytes,
     );
   }
 }
 
 enum ConnectionStatus { connected, notConnected, error }
+enum ScreenShareStatus { displayScreenshot, startCapturing, stopSharing, offline }
