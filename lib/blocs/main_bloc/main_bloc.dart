@@ -1,17 +1,19 @@
-import 'dart:convert';
-
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:remote_control_app/utils/Logger.dart';
 import 'package:remote_control_app/blocs/main_bloc/main_event.dart';
 import 'package:remote_control_app/blocs/main_bloc/main_state.dart';
 import 'package:remote_control_app/repositories/api_repository.dart';
 import 'package:remote_control_app/repositories/socket_repository.dart';
 import 'package:flutter/services.dart';
+import 'dart:typed_data';
+
+import 'package:remote_control_app/utils/constant_values.dart';
 
 class MainBloc extends Bloc<MainEvent, MainState> {
 
   final ApiRepository _apiRepository;
   final SocketRepository _socketRepository;
-  final MethodChannel _channel = const MethodChannel('capture_screenshot_channel');
+  late MethodChannel methodChannel = const MethodChannel(ConstantValues.methodChannelName);
   Uint8List? screenshotData = Uint8List(0);
 
   MainBloc(super.initialState,
@@ -19,70 +21,49 @@ class MainBloc extends Bloc<MainEvent, MainState> {
         required SocketRepository socketRepository
       }) : _apiRepository = apiRepository,
         _socketRepository = socketRepository {
+    _apiRepository.toString(); // Remove it
     on<InitializeConnection>(_onInitializeConnection);
-    on<SendScreenshot>(_onScreenshotTransfer);
+    on<StartScreenSharing>(_startScreenSharing);
     on<SetScreenshotCallback>(_getScreenshot);
+
   }
 
-  void _onInitializeConnection(InitializeConnection event, Emitter<MainState> emit) async {
-
+  void _onInitializeConnection(InitializeConnection event, Emitter<MainState> emit) {
     bool isConnected = _socketRepository.initializeConnection();
 
     emit(state.copyWith(
-        connectionStatus: isConnected ? ConnectionStatus.connected : ConnectionStatus.error,
+      connectionStatus: isConnected ? ConnectionStatus.connected : ConnectionStatus.error,
     ));
-
   }
 
-  void _onScreenshotTransfer(SendScreenshot event, Emitter<MainState> emit) async {
-
-    _socketRepository.sendScreenshot(event.screenshotChunk);
-    // emit(state.copyWith(
-    //   status: isConnected ? ConnectionStatus.connected : ConnectionStatus.error,
-    // ));
-
+  void _startScreenSharing(StartScreenSharing event, Emitter<MainState> emit) async {
+    try {
+      methodChannel.invokeMethod(ConstantValues.nativeStartScreenSharingMethod);
+      listenForScreenshots();
+    } on PlatformException catch (e) {
+      Logger.Red.log("Failed to start screen sharing: '${e.message}'.");
+    }
   }
 
   void _getScreenshot(SetScreenshotCallback event, Emitter<MainState> emit) async {
-
     _socketRepository.setScreenshotCallback(screenshotCallback);
-    // emit(state.copyWith(
-    //   status: isConnected ? ConnectionStatus.connected : ConnectionStatus.error,
-    // ));
-
   }
 
-  void startScreenSharing() async {
-    try {
-      await _channel.invokeMethod('startScreenSharing');
-    } on PlatformException catch (e) {
-      print("Failed to start screen sharing: '${e.message}'.");
-    }
-  }
-
-  void screenshotCallback(String chunk) {
-    assembleScreenshot(chunk);
-  }
-
-  void assembleScreenshot(String chunk) {
-    if (chunk.contains("<start>")) {
-      chunk = chunk.replaceAll("<start>", "");
-      screenshotData = Uint8List.fromList([]);
-      screenshotData = chunkToBytes(chunk);
-    } else if (chunk.contains("<end>")) {
-      chunk = chunk.replaceAll("<end>", "");
-      screenshotData = chunkToBytes(chunk);
-      emit(state.copyWith(
+  void screenshotCallback(Uint8List screenshotData) async {
+    emit(state.copyWith(
         screenShareStatus: ScreenShareStatus.displayScreenshot,
         screenshotBytes: screenshotData
-      ));
-    } else{
-      screenshotData = chunkToBytes(chunk);
-    }
+    ));
   }
 
-  Uint8List chunkToBytes(String chunk) {
-    return Uint8List.fromList([...screenshotData!, ...utf8.encode(chunk)]);
+  void listenForScreenshots() {
+    methodChannel.setMethodCallHandler((call) async {
+      if (call.method == ConstantValues.nativeReceiveScreenshotMethod) {
+        final List<int> screenshotData = call.arguments.cast<int>();
+        Uint8List screnshot = Uint8List.fromList(screenshotData);
+       _socketRepository.sendScreenshot(screnshot);
+      }
+    });
   }
 
 }

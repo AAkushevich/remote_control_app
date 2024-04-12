@@ -1,24 +1,22 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:remote_control_app/utils/Logger.dart';
 import "package:socket_io_client/socket_io_client.dart";
 
 abstract class ISocketService {
-  void sendScreenshot(String chunk);
+  void sendScreenshot(Uint8List chunk);
   bool connectToSocket();
   void dispose();
-  void setScreenshotCallback(Function(String) callback);
-
+  void setScreenshotCallback(Function(Uint8List) callback);
 }
 
 class SocketService implements ISocketService {
   late final Socket _socket;
-  Function(String) _screenshotCallback = (data) {};
+  Function(Uint8List) _screenshotCallback = (data) {};
   bool isConnected = false;
 
   SocketService() {
-    _socket = io('http://192.168.100.2:3000', <String, dynamic>{
+    _socket = io('http://192.168.100.3:3000', <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': false,
     });
@@ -45,7 +43,6 @@ class SocketService implements ISocketService {
         _screenshotCallback!(data);
       });
     }
-
     // Connect to the socket
     connectToSocket();
   }
@@ -57,12 +54,12 @@ class SocketService implements ISocketService {
     return isConnected;
   }
 
-  void sendScreenshot(String chunk) {
+  void sendScreenshot(Uint8List chunk) {
     _socket.emit("send_screenshot", chunk);
   }
 
   @override
-  void setScreenshotCallback(Function(String) callback) {
+  void setScreenshotCallback(Function(Uint8List) callback) {
     _screenshotCallback = callback;
   }
 

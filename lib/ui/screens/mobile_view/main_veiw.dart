@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:remote_control_app/blocs/main_bloc/main_bloc.dart';
 import 'package:remote_control_app/blocs/main_bloc/main_event.dart';
@@ -10,32 +9,19 @@ class MainView extends StatefulWidget {
   const MainView({super.key});
 
   @override
-  _MainViewState createState() => _MainViewState();
+  MainViewState createState() => MainViewState();
 }
 
-class _MainViewState extends State<MainView> {
+class MainViewState extends State<MainView> {
 
   late final GlobalKey _boundaryKey;
-  final MethodChannel _channel = const MethodChannel('capture_screenshot_channel');
 
   @override
   void initState() {
     super.initState();
-
     _boundaryKey = GlobalKey();
-
-    if(Platform.isWindows) {
+    if(Platform.isWindows)
       context.read<MainBloc>().add(SetScreenshotCallback());
-    }
-
-    _channel.setMethodCallHandler((call) async {
-      if (call.method == 'receiveScreenshotData') {
-        setState(() {
-          context.read<MainBloc>().add(SendScreenshot(call.arguments));
-        });
-      }
-    });
-
   }
 
   @override
@@ -51,23 +37,30 @@ class _MainViewState extends State<MainView> {
         return RepaintBoundary(
           key: _boundaryKey,
           child: Scaffold(
-            body: Center(
-              child: Platform.isAndroid ? ElevatedButton(
-                onPressed: () {
-                  startScreenSharing();
-                },
-                child: const Text('Start Screen Sharing'),
+            body:
+            Center(
+              child: Platform.isAndroid ? Column(
+                mainAxisAlignment: MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.max,
+                children: [
+                  ElevatedButton(
+                    onPressed: () {
+                      context.read<MainBloc>().add(const StartScreenSharing());
+                    },
+                    child: const Text('Start Screen Sharing'),
+                  ),
+                ],
               ) : Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  if (context.read<MainBloc>().state.screenShareStatus == ScreenShareStatus.displayScreenshot)
-                    Image.memory(
+                  context.read<MainBloc>().state.screenshotBytes.isNotEmpty
+                    ? Image.memory(
                       context.read<MainBloc>().state.screenshotBytes,
-                      width: 350,
-                      height: 625,
-                    )
-                  else
-                    Text('No screenshot available'),
+                      height: MediaQuery.of(context).size.height * 0.8,
+                      width: MediaQuery.of(context).size.width * 0.4,
+                  )
+                    : const Text('No screenshot available'),
                   const SizedBox(height: 20),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -90,21 +83,6 @@ class _MainViewState extends State<MainView> {
         );
       },
     );
-  }
-
-  void startScreenSharing() async {
-    try {
-      // Invoke method to start screen sharing in native Android code
-      await _channel.invokeMethod('startScreenSharing');
-      // Listen for incoming screenshot data from native Android code
-
-    } on PlatformException catch (e) {
-      print("Failed to start screen sharing: '${e.message}'.");
-    }
-  }
-
-  void _receiveScreenshot(List<int> screenshotBytes) {
-    // Handle the received screenshot bytes here
   }
 
 }

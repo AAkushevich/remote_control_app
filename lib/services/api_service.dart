@@ -8,7 +8,7 @@ abstract class IApiService {
   Future<String> loginUser(Map<String, dynamic> body);
 }
 
-@RestApi(baseUrl: "http://192.168.100.2:3000")
+@RestApi(baseUrl: "http://192.168.100.3:3000")
 abstract class ApiService implements IApiService {
   factory ApiService(Dio dio, {String baseUrl}) = _ApiService;
 
