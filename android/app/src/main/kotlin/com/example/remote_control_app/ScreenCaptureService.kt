@@ -1,4 +1,6 @@
 package com.example.remote_control_app
+
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -6,50 +8,45 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.PixelFormat
-import android.graphics.Rect
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
-import android.media.ImageReader
+import android.media.MediaCodec
+import android.media.MediaCodecInfo
+import android.media.MediaFormat
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.util.DisplayMetrics
-import android.util.Log
-import android.view.WindowManager
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
-import kotlinx.coroutines.flow.MutableSharedFlow
-import java.io.ByteArrayOutputStream
-import java.nio.ByteBuffer
+import com.example.remote_control_app.utils.MethodChannelSender
 
 class ScreenCaptureService : Service() {
 
     private lateinit var mediaProjectionManager: MediaProjectionManager
     private var mediaProjection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
-    private var imageReader: ImageReader? = null
-    private val handler = Handler()
-    private lateinit var screenShotBitmap: Bitmap
-    private lateinit var screenShotCanvas: Canvas
-    private lateinit var screenShotPaint: Paint
+    private lateinit var mediaCodec: MediaCodec
     private var displayWidth: Int = 0
     private var displayHeight: Int = 0
     private var displayMetrics: DisplayMetrics? = null
     private val screenDensity: Int
         get() = displayMetrics?.densityDpi ?: DisplayMetrics.DENSITY_DEFAULT
 
+    private val frameRate = 25 // Desired frame rate for screen capture
+    private val frameInterval = 1000 / frameRate.toLong() // Frame interval in milliseconds
+
+    private var frameIndex = 0
+
     override fun onBind(intent: Intent?): IBinder? {
         return null
     }
 
     override fun onCreate() {
-        super.onCreate();
+        super.onCreate()
 
         displayMetrics = resources.displayMetrics
         displayWidth = resources.displayMetrics.widthPixels
@@ -57,6 +54,22 @@ class ScreenCaptureService : Service() {
         mediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
 
         startScreenCapture()
+    }
+
+    @SuppressLint("WrongConstant")
+    private fun createMediaCodec() {
+        val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, displayWidth, displayHeight)
+        format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
+        format.setInteger(MediaFormat.KEY_BIT_RATE, 100000)
+        format.setInteger(MediaFormat.KEY_FRAME_RATE, frameRate)
+        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
+
+        try {
+            mediaCodec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
+            mediaCodec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private fun startScreenCapture() {
@@ -73,16 +86,65 @@ class ScreenCaptureService : Service() {
         return START_NOT_STICKY
     }
 
-    private fun stopCapture() {
-        handler.removeCallbacks(captureRunnable)
+    private fun startMediaProjection(intent: Intent) {
+        val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, -1)
+        val data = intent.getParcelableExtra<Intent>(EXTRA_DATA)
+        mediaProjection = data?.let { mediaProjectionManager.getMediaProjection(resultCode, it) }
+
+        createMediaCodec()
+
+        virtualDisplay = mediaProjection?.createVirtualDisplay(
+            "ScreenCapture",
+            displayWidth,
+            displayHeight,
+            screenDensity,
+            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+            mediaCodec.createInputSurface(),
+            null,
+            Handler(Looper.getMainLooper())
+        )
+
+        mediaCodec.start()
+        startCapturing()
+    }
+
+    private fun startCapturing() {
+        val bufferInfo = MediaCodec.BufferInfo()
+
+        Handler().postDelayed(object : Runnable {
+            override fun run() {
+                val outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, 33333)
+                if (outputBufferIndex >= 0) {
+                    val outputBuffer = mediaCodec.getOutputBuffer(outputBufferIndex)
+                    val outData = ByteArray(bufferInfo.size)
+                    outputBuffer?.position(bufferInfo.offset)
+                    outputBuffer?.limit(bufferInfo.offset + bufferInfo.size)
+                    outputBuffer?.get(outData)
+
+                    sendVideoFrame(outData)
+
+                    mediaCodec.releaseOutputBuffer(outputBufferIndex, false)
+                }
+
+                if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
+                    stopScreenCapture()
+                } else {
+                    Handler(Looper.getMainLooper()).postDelayed(this, frameInterval)
+                }
+            }
+        }, frameInterval)
+    }
+
+    private fun stopScreenCapture() {
+        mediaCodec.stop()
+        mediaCodec.release()
         mediaProjection?.stop()
         mediaProjection = null
         virtualDisplay?.release()
         virtualDisplay = null
-        imageReader?.close()
-        imageReader = null
+        stopForeground(true)
+        stopSelf()
     }
-
 
     private fun createNotification(): Notification {
         val channelId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -110,76 +172,8 @@ class ScreenCaptureService : Service() {
         return channelId
     }
 
-    private fun startMediaProjection(intent: Intent) {
-        val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, -1)
-        val data = intent.getParcelableExtra<Intent>(EXTRA_DATA)
-        mediaProjection = data?.let { mediaProjectionManager.getMediaProjection(resultCode, it) }
-        imageReader = ImageReader.newInstance(displayWidth, displayHeight, PixelFormat.RGBA_8888, 2)
-        virtualDisplay = mediaProjection?.createVirtualDisplay(
-            "Screenshot",
-            displayWidth,
-            displayHeight,
-            screenDensity,
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-            imageReader?.surface,
-            null,
-            handler
-        )
-
-        handler.postDelayed(captureRunnable, CAPTURE_DELAY)
-    }
-
-    private val captureRunnable = object : Runnable {
-        override fun run() {
-            captureScreen()
-            handler.postDelayed(this, CAPTURE_DELAY)
-        }
-    }
-
-    private fun captureScreen() {
-        val image = imageReader?.acquireLatestImage() ?: return
-        val planes = image.planes
-        val buffer = planes[0].buffer
-        val pixelStride = planes[0].pixelStride
-        val rowStride = planes[0].rowStride
-        val rowPadding = rowStride - pixelStride * image.width
-
-        screenShotBitmap = Bitmap.createBitmap(
-            image.width + rowPadding / pixelStride,
-            image.height,
-            Bitmap.Config.ARGB_8888
-        )
-
-        screenShotBitmap.copyPixelsFromBuffer(buffer)
-
-        val width = image.width
-        val height = image.height
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val sourceRect = Rect(0, 0, width, height)
-        val destRect = Rect(0, 0, width, height)
-        screenShotCanvas = Canvas(bitmap)
-        screenShotCanvas.drawBitmap(screenShotBitmap, sourceRect, destRect, null)
-
-        val stream = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream)
-        val screenshotBytes = stream.toByteArray()
-
-        sendScreenshot(screenshotBytes)
-
-        image.close()
-    }
-
-    private fun sendScreenshot(screenshotData: ByteArray) {
-        MethodChannelSender.sendScreenshotBytes(screenshotData)
-    }
-
-    private fun stopScreenCapture() {
-        mediaProjection?.stop()
-        mediaProjection = null
-        virtualDisplay?.release()
-        virtualDisplay = null
-        imageReader?.close()
-        imageReader = null
+    private fun sendVideoFrame(frameData: ByteArray) {
+        MethodChannelSender.sendVideoFrame(frameData)
     }
 
     companion object {
@@ -187,10 +181,5 @@ class ScreenCaptureService : Service() {
         const val ACTION_START_CAPTURE = "com.example.remote_control_app.START_CAPTURE"
         const val EXTRA_RESULT_CODE = "com.example.remote_control_app.EXTRA_RESULT_CODE"
         const val EXTRA_DATA = "com.example.remote_control_app.EXTRA_DATA"
-        private const val CAPTURE_DELAY = 1000L // Delay between captures in milliseconds
-        const val REQUEST_CODE_SCREEN_CAPTURE = 101 // Add this line
-
     }
 }
-
-

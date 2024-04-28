@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:remote_control_app/utils/constant_values.dart';
 import 'package:retrofit/retrofit.dart';
 
 part 'api_service.g.dart';
@@ -8,7 +9,7 @@ abstract class IApiService {
   Future<String> loginUser(Map<String, dynamic> body);
 }
 
-@RestApi(baseUrl: "http://192.168.100.3:3000")
+@RestApi(baseUrl: ConstantValues.baseUrl)
 abstract class ApiService implements IApiService {
   factory ApiService(Dio dio, {String baseUrl}) = _ApiService;
 

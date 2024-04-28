@@ -1,4 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:remote_control_app/services/signaling.dart';
 import 'package:remote_control_app/utils/Logger.dart';
 import 'package:remote_control_app/blocs/main_bloc/main_event.dart';
 import 'package:remote_control_app/blocs/main_bloc/main_state.dart';
@@ -15,34 +17,43 @@ class MainBloc extends Bloc<MainEvent, MainState> {
   final SocketRepository _socketRepository;
   late MethodChannel methodChannel = const MethodChannel(ConstantValues.methodChannelName);
   Uint8List? screenshotData = Uint8List(0);
+  late Signaling signaling;
+
+  RTCVideoRenderer _localRenderer = RTCVideoRenderer();
+  RTCVideoRenderer remoteRenderer = RTCVideoRenderer();
+  String? roomId;
 
   MainBloc(super.initialState,
       {required ApiRepository apiRepository,
         required SocketRepository socketRepository
       }) : _apiRepository = apiRepository,
         _socketRepository = socketRepository {
-    _apiRepository.toString(); // Remove it
-    on<InitializeConnection>(_onInitializeConnection);
-    on<StartScreenSharing>(_startScreenSharing);
-    on<SetScreenshotCallback>(_getScreenshot);
 
+    signaling = Signaling(clientConnectedEvent);
+
+    on<InitializeConnection>(_onInitializeConnection);
+    on<SetScreenshotCallback>(_getScreenshot);
+    on<ListenForScreenshots>(_listenForScreenshots);
+    on<StartScreenSharing>(_startScreenSharing);
+    on<StopScreenSharing>(_stopScreenSharing);
+    on<CreateRoom>(_createRoom);
+  }
+
+  void clientConnectedEvent() {
+    if(WebRTC.platformIsWindows && state.desktopStatus != AppStatus.room) {
+      emit(state.copyWith(
+        desktopStatus: AppStatus.room,
+      ));
+    }
   }
 
   void _onInitializeConnection(InitializeConnection event, Emitter<MainState> emit) {
-    bool isConnected = _socketRepository.initializeConnection();
+    _localRenderer.initialize();
+    remoteRenderer.initialize();
 
-    emit(state.copyWith(
-      connectionStatus: isConnected ? ConnectionStatus.connected : ConnectionStatus.error,
-    ));
-  }
-
-  void _startScreenSharing(StartScreenSharing event, Emitter<MainState> emit) async {
-    try {
-      methodChannel.invokeMethod(ConstantValues.nativeStartScreenSharingMethod);
-      listenForScreenshots();
-    } on PlatformException catch (e) {
-      Logger.Red.log("Failed to start screen sharing: '${e.message}'.");
-    }
+    signaling.onAddRemoteStream = ((stream) {
+      remoteRenderer.srcObject = stream;
+    });
   }
 
   void _getScreenshot(SetScreenshotCallback event, Emitter<MainState> emit) async {
@@ -56,14 +67,47 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     ));
   }
 
-  void listenForScreenshots() {
-    methodChannel.setMethodCallHandler((call) async {
-      if (call.method == ConstantValues.nativeReceiveScreenshotMethod) {
-        final List<int> screenshotData = call.arguments.cast<int>();
-        Uint8List screnshot = Uint8List.fromList(screenshotData);
-       _socketRepository.sendScreenshot(screnshot);
-      }
-    });
+  void _listenForScreenshots(ListenForScreenshots event, Emitter<MainState> emit) async {
+
   }
 
+  void _startScreenSharing(StartScreenSharing event, Emitter<MainState> emit) async {
+    try {
+      signaling.openUserMedia(_localRenderer, remoteRenderer);
+      signaling.joinRoom(
+        event.roomCode,
+        _localRenderer,
+      );
+      emit(state.copyWith(
+          desktopStatus: AppStatus.room,
+      ));
+    } on PlatformException catch (e) {
+      Logger.Red.log("Failed to start screen sharing: '${e.message}'.");
+    }
+  }
+
+  void _stopScreenSharing(StopScreenSharing event, Emitter<MainState> emit) async {
+    try {
+      _localRenderer.dispose();
+      emit(state.copyWith(
+          desktopStatus: AppStatus.main
+      ));
+    } on PlatformException catch (e) {
+      Logger.Red.log("${e.message}.");
+    }
+  }
+
+  void _createRoom(CreateRoom event, Emitter<MainState> emit) async {
+    try {
+      roomId = await signaling.createRoom(
+          _localRenderer);
+
+      emit(state.copyWith(
+          desktopStatus: AppStatus.joinRoom,
+          roomCode: roomId
+      ));
+    } on PlatformException catch (e) {
+      Logger.Red.log("${e.message}.");
+    }
+  }
 }

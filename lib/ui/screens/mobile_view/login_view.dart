@@ -1,3 +1,4 @@
+/*
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
@@ -40,11 +41,15 @@ class LoginView extends StatelessWidget {
                   child: const MainView(),
                   create: (_) =>
                       MainBloc(
-                          MainState(
+                          */
+/*MainState(
                             connectionStatus: ConnectionStatus.notConnected,
                             screenshotBytes: Uint8List(0),
-                          ),
-                          apiRepository: ApiRepository(ApiService(Dio())),
+                          ),*//*
+
+                          */
+/*apiRepository: ApiRepository(ApiService(Dio())),*//*
+
                           socketRepository: SocketRepository(socketService: _socketService)
                       )
                 )));
@@ -126,4 +131,4 @@ class LoginView extends StatelessWidget {
     );
   }
 
-}
+}*/

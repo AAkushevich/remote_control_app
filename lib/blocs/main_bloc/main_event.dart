@@ -13,9 +13,6 @@ final class SendScreenshot extends MainEvent {
   const SendScreenshot(this.screenshotChunk);
 }
 
-final class StartScreenSharing extends MainEvent {
-  const StartScreenSharing();
-}
 
 final class ListenForScreenshots extends MainEvent {
   const ListenForScreenshots();
@@ -23,4 +20,22 @@ final class ListenForScreenshots extends MainEvent {
 
 final class SetScreenshotCallback extends MainEvent {
   SetScreenshotCallback();
+}
+
+
+final class StartScreenSharing extends MainEvent {
+  final String roomCode;
+  const StartScreenSharing(this.roomCode);
+}
+
+final class StopScreenSharing extends MainEvent {
+  const StopScreenSharing();
+}
+
+final class CreateRoom extends MainEvent {
+  const CreateRoom();
+}
+
+final class ScanQrCode extends MainEvent {
+  const ScanQrCode();
 }

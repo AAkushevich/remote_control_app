@@ -1,11 +1,25 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+<manifest xmlns:tools="http://schemas.android.com/tools"
+    xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.android.permission.CAPTURE_VIDEO_OUTPUT" />
     <uses-permission android:name="android.permission.android.BIND_ACCESSIBILITY_SERVICE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.PROJECT_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.CAPTURE_AUDIO_OUTPUT"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 
     <application
         android:label="remote_control_app"
@@ -35,17 +49,15 @@
             </intent-filter>
         </activity>
 
-        <receiver android:name=".ServiceCommunicationReceiver">
-            <intent-filter>
-                <action android:name="com.example.broadcast_messages" />
-            </intent-filter>
-        </receiver>
 
-        <service
+        <!--<service
             android:name="ScreenCaptureService"
 
             android:foregroundServiceType="mediaProjection"
-            />
+            />-->
+        <service
+            android:name=".ScreenCaptureService"
+            android:foregroundServiceType="mediaProjection" />
         <service
             android:name=".MyAccessibilityService"
             android:label="My Accessibility Service"

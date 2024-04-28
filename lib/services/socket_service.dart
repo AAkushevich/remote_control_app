@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:remote_control_app/utils/Logger.dart';
+import 'package:remote_control_app/utils/constant_values.dart';
 import "package:socket_io_client/socket_io_client.dart";
 
 abstract class ISocketService {
@@ -16,7 +17,7 @@ class SocketService implements ISocketService {
   bool isConnected = false;
 
   SocketService() {
-    _socket = io('http://192.168.100.3:3000', <String, dynamic>{
+/*    _socket = io(ConstantValues.baseUrl, <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': false,
     });
@@ -44,7 +45,7 @@ class SocketService implements ISocketService {
       });
     }
     // Connect to the socket
-    connectToSocket();
+    connectToSocket();*/
   }
 
   @override

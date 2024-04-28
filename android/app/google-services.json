@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "67490601705",
+    "project_id": "remote-control-app-d69ad",
+    "storage_bucket": "remote-control-app-d69ad.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:67490601705:android:dd236592d5f5d48f046e78",
+        "android_client_info": {
+          "package_name": "com.example.remote_control_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDLQZdpt4yV1aGLRvt91RFLMibzr7WXsY8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
