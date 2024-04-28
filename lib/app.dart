@@ -1,28 +1,30 @@
 import 'dart:async';
-import 'dart:io' show Platform;
+import 'dart:typed_data';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:remote_control_app/blocs/login_bloc/login_bloc.dart';
 import 'package:remote_control_app/blocs/login_bloc/login_state.dart';
+import 'package:remote_control_app/blocs/main_bloc/main_bloc.dart';
 import 'package:remote_control_app/blocs/main_bloc/main_state.dart';
 import 'package:remote_control_app/repositories/socket_repository.dart';
-import 'package:remote_control_app/ui/screens/desktop_view/desktop_view.dart';
+import 'package:remote_control_app/services/api_service.dart';
+import 'package:remote_control_app/services/socket_service.dart';
 import 'package:remote_control_app/ui/screens/mobile_view/login_view.dart';
-import 'package:remote_control_app/ui/screens/mobile_view/main_veiw.dart';
-import 'package:remote_control_app/ui/screens/mobile_view/mobile_view.dart';
 import 'package:remote_control_app/repositories/api_repository.dart';
+import 'package:remote_control_app/ui/screens/mobile_view/main_veiw.dart';
 
-import 'blocs/main_bloc/main_bloc.dart';
 class App extends StatelessWidget {
   const App({
     Key? key,
-    required this.apiRepository, required this.socketRepository,
+    required this.apiRepository,
+    required this.socketService
   }) : super(key: key);
 
   final ApiRepository apiRepository;
-  final SocketRepository socketRepository;
+  final ISocketService socketService;
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +35,7 @@ class App extends StatelessWidget {
       ),
       home: BlocProvider(
         create: (context) => AppBloc(),
-        child: AppView(apiRepository: apiRepository, socketRepository: socketRepository),
+        child: AppView(apiRepository: apiRepository, socketService: socketService,),
       ),
     );
   }
@@ -42,27 +44,29 @@ class App extends StatelessWidget {
 class AppView extends StatelessWidget {
   const AppView({
     Key? key,
-    required this.apiRepository, required this.socketRepository,
+    required this.apiRepository,
+    required this.socketService
   }) : super(key: key);
 
   final ApiRepository apiRepository;
-  final SocketRepository socketRepository;
+  final ISocketService socketService;
+
   @override
   Widget build(BuildContext context) {
     return RepositoryProvider.value(
       value: apiRepository,
-      child: MultiBlocProvider(
-        providers: [
-          BlocProvider(
-              create: (_) =>
-                  LoginBloc(
-                      const LoginState(email: "", password: ""),
-                      apiRepository: apiRepository
-                  )
-          ),
-
-        ],
-        child: LoginView(),
+      child: BlocProvider(
+          child: const MainView(),
+          create: (_) =>
+              MainBloc(
+                  MainState(
+                    connectionStatus: ConnectionStatus.notConnected,
+                    screenshotBytes: Uint8List(0),
+                    remoteRenderer: RTCVideoRenderer()
+                  ),
+                  apiRepository: ApiRepository(ApiService(Dio())),
+                  socketRepository: SocketRepository(socketService: socketService)
+              )
       ),
     );
   }
@@ -72,7 +76,6 @@ class AppView extends StatelessWidget {
 class AppBloc extends Bloc<AppEvent, AppState> {
   AppBloc() : super(const InitialAppState());
 
-  @override
   Stream<AppState> mapEventToState(AppEvent event) async* {
     // Handle events if needed
   }

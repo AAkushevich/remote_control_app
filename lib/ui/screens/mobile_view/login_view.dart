@@ -1,3 +1,4 @@
+/*
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
@@ -20,10 +21,11 @@ class LoginView extends StatelessWidget {
   late TextEditingController emailController;
   late TextEditingController passwordController;
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-
-  LoginView({Key? key}) {
+  late ISocketService _socketService;
+  LoginView({super.key}) {
     emailController = TextEditingController();
     passwordController = TextEditingController();
+    _socketService = SocketService();
   }
 
   @override
@@ -39,12 +41,16 @@ class LoginView extends StatelessWidget {
                   child: const MainView(),
                   create: (_) =>
                       MainBloc(
-                          MainState(
-                            status: ConnectionStatus.notConnected,
-                            screenshotBytes: Uint8List(0), // Provide a valid Uint8List here
-                          ),
-                          apiRepository: ApiRepository(ApiService(Dio())),
-                          socketRepository: SocketRepository(socketService: SocketService())
+                          */
+/*MainState(
+                            connectionStatus: ConnectionStatus.notConnected,
+                            screenshotBytes: Uint8List(0),
+                          ),*//*
+
+                          */
+/*apiRepository: ApiRepository(ApiService(Dio())),*//*
+
+                          socketRepository: SocketRepository(socketService: _socketService)
                       )
                 )));
           }
@@ -69,7 +75,7 @@ class LoginView extends StatelessWidget {
                         return 'Please enter your email';
                       }
                       // Email regex pattern for basic email validation
-                      final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                      final emailRegex = RegExp(r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$');
                       if (!emailRegex.hasMatch(value)) {
                         return 'Please enter a valid email';
                       }
@@ -96,9 +102,10 @@ class LoginView extends StatelessWidget {
                   ElevatedButton(
                     onPressed: () {
                       //if (_formKey.currentState!.validate()) {
-                        context.read<LoginBloc>().add(LoginRequest(
+                        context.read<LoginBloc>().add(const LoginRequest(
                         "email.test@example.com", "qwe456zxc"
                         )
+
                             // emailController.text,
                             // passwordController.text)
                         );
@@ -124,4 +131,4 @@ class LoginView extends StatelessWidget {
     );
   }
 
-}
+}*/

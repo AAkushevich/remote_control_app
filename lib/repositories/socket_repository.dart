@@ -20,3 +20,4 @@ class SocketRepository {
     _socketService.setScreenshotCallback(callback);
   }
 }
+

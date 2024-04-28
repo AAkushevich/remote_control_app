@@ -1,55 +1,62 @@
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:remote_control_app/utils/Logger.dart';
+import 'package:remote_control_app/utils/constant_values.dart';
+import "package:socket_io_client/socket_io_client.dart";
 
 abstract class ISocketService {
-  void sendScreenshot(Uint8List byteList);
+  void sendScreenshot(Uint8List chunk);
   bool connectToSocket();
   void dispose();
   void setScreenshotCallback(Function(Uint8List) callback);
-
 }
 
 class SocketService implements ISocketService {
-  late final IO.Socket _socket;
+  late final Socket _socket;
   Function(Uint8List) _screenshotCallback = (data) {};
+  bool isConnected = false;
 
   SocketService() {
-    _socket = IO.io('http://192.168.0.103:3000', <String, dynamic>{
+/*    _socket = io(ConstantValues.baseUrl, <String, dynamic>{
       'transports': ['websocket'],
-      'autoConnect': false, // Optionally set autoConnect to false
-      'connectTimeout': 5000, // Set the connection timeout to 5 seconds (5000 milliseconds)
+      'autoConnect': false,
     });
-    connectToSocket();
+
+    _socket.onConnect((data) {
+      Logger.Green.log("Connected to socket");
+      isConnected = true;
+    });
+
+    _socket.on('connect_error', (data) {
+      Logger.Red.log("Socket connection error");
+      isConnected = false;
+    });
+
+    _socket.on('connect_timeout', (data) {
+      Logger.Red.log("Socket connection timed out: $data");
+      isConnected = false;
+    });
+
+    _socket.onConnectError((data) => Logger.Red.log("_socket.onConnectError: " + data.toString()));
+
+    if (Platform.isWindows) {
+      _socket.on('get_screenshot', (data) {
+        _screenshotCallback!(data);
+      });
+    }
+    // Connect to the socket
+    connectToSocket();*/
   }
 
   @override
   bool connectToSocket() {
-
-    bool isConnected = false;
-
     _socket.connect();
-
-    _socket.on('connect', (_) { isConnected = true; });
-
-    _socket.onConnectError((data) =>
-        print(data.toString())
-    );
-
-    if (Platform.isWindows) {
-      // Add listener for 'get_screenshot' event only for PC
-      _socket.on('get_screenshot', (data) {
-        print('Received screenshot data: $data');
-        _screenshotCallback!(data);
-      });
-    }
-
+    Logger.Blue.log("isConnected: " + isConnected.toString());
     return isConnected;
   }
 
-  @override
-  void sendScreenshot(Uint8List byteList) {
-    _socket.emit('send_screenshot', byteList);
+  void sendScreenshot(Uint8List chunk) {
+    _socket.emit("send_screenshot", chunk);
   }
 
   @override

@@ -9,12 +9,33 @@ final class InitializeConnection extends MainEvent {
 }
 
 final class SendScreenshot extends MainEvent {
-  final Uint8List screenshotBytes;
-  const SendScreenshot(this.screenshotBytes);
+  final Uint8List screenshotChunk;
+  const SendScreenshot(this.screenshotChunk);
+}
+
+
+final class ListenForScreenshots extends MainEvent {
+  const ListenForScreenshots();
 }
 
 final class SetScreenshotCallback extends MainEvent {
-  final Function(Uint8List) callback;
+  SetScreenshotCallback();
+}
 
-  SetScreenshotCallback(this.callback);
+
+final class StartScreenSharing extends MainEvent {
+  final String roomCode;
+  const StartScreenSharing(this.roomCode);
+}
+
+final class StopScreenSharing extends MainEvent {
+  const StopScreenSharing();
+}
+
+final class CreateRoom extends MainEvent {
+  const CreateRoom();
+}
+
+final class ScanQrCode extends MainEvent {
+  const ScanQrCode();
 }
