@@ -15,7 +15,7 @@ dependencies:
   cloud_firestore: ^4.17.2
   flutter_webrtc: ^0.10.3
 
-  #pretty_qr_code: ^3.3.0
+  pretty_qr_code: ^3.3.0
   #flutter_barcode_scanner: ^2.0.0
   toasty_box: ^1.0.1
   cupertino_icons: ^1.0.2
