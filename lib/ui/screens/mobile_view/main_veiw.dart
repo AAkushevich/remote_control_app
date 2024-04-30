@@ -1,11 +1,14 @@
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+//import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:remote_control_app/blocs/main_bloc/main_bloc.dart';
 import 'package:remote_control_app/blocs/main_bloc/main_event.dart';
 import 'package:remote_control_app/blocs/main_bloc/main_state.dart';
@@ -62,6 +65,7 @@ class MainViewState extends State<MainView> {
         return WaveButton(
           child: const Text("Создать комнату",
               style: TextStyle(
+                fontFamily: 'Montserrat',
                 color: Colors.white,
               )),
           onPressed: () {
@@ -70,50 +74,140 @@ class MainViewState extends State<MainView> {
         );
       case AppStatus.joinRoom:
 
-        return Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const Text("Введите код на мобильном устройстве, чтобы подключиться к компьютеру."),
-            Padding(
-              padding: const EdgeInsets.only(top: 48),
-              child: Container(
-                width: MediaQuery.of(context).size.width * 0.35,
-                height: MediaQuery.of(context).size.height * 0.25,
-                decoration: const BoxDecoration(
-                  color: Color.fromRGBO(20, 15, 11, 0.65),
-                  borderRadius: BorderRadius.all(Radius.circular(55))
-                ),
-                child: Center(
-                  child: Text(context.read<MainBloc>().state.roomCode, style: const TextStyle(color: Colors.white, fontSize: 32),),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: WaveButton(
-                child: const Icon(Icons.copy, color: Colors.white,),
-                onPressed: () {
-                  final data = ClipboardData(text: context.read<MainBloc>().state.roomCode);
-                  Clipboard.setData(data);
-                  ToastService.showToast(
-                    context,
-                    message: "Скопировано в буфер обмена.",
-                  );
-                },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: 48),
-              child: WaveButton(
-                child: const Text("Вернуться",
-                    style: TextStyle(
+        return Container(
+          width: MediaQuery.of(context).size.width,
+          height: MediaQuery.of(context).size.height,
+          decoration: const BoxDecoration(
+            color: Color.fromRGBO(14, 14, 14, 1)
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(top: 30.0, left: 50, bottom: 15),
+                child: Text(
+                  "Есть два способа подключения.",
+                  style: TextStyle(
+                      fontFamily: 'Montserrat',
                       color: Colors.white,
-                    )),
-                onPressed: () {},
+                      fontWeight: FontWeight.bold,
+                      fontSize: 28
+                  ),
+                ),
               ),
-            )
-          ],
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: MediaQuery.of(context).size.width * 0.49,
+                    height: MediaQuery.of(context).size.height * 0.7,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Отсканируйте QR-код, через приложение на телефоне.",
+                          style: TextStyle(
+                              fontFamily: 'Montserrat',
+                              color: Colors.white,
+                              fontSize: 22
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 48),
+                          child: Container(
+                            height: MediaQuery.of(context).size.height * 0.4,
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.all(Radius.circular(35))
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: PrettyQrView(
+                                qrImage: QrImage(
+                                  QrCode(
+                                    8,
+                                    QrErrorCorrectLevel.H,
+                                  )..addData(context.read<MainBloc>().state.roomCode),
+                                ),
+                                decoration: const PrettyQrDecoration(),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    color: Colors.white,
+                    width: 0.5,
+                    height: MediaQuery.of(context).size.height * 0.55,
+                  ),
+                  SizedBox(
+                    width: MediaQuery.of(context).size.width * 0.49,
+                    height: MediaQuery.of(context).size.height * 0.7,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const Text(
+                          "Или введите этот код в приложении.",
+                          style: TextStyle(
+                              fontFamily: 'Montserrat',
+                              color: Colors.white,
+                              fontSize: 22
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 48),
+                          child: Center(
+                            child: Text(
+                              context.read<MainBloc>().state.roomCode,
+                              style: const TextStyle(
+                                  fontFamily: 'Montserrat',
+                                  color: Colors.white,
+                                  fontSize: 32),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: WaveButton(
+                            child: const Icon(Icons.copy, color: Colors.black,),
+                            backgroundColor: Colors.white,
+                            onPressed: () {
+                              final data = ClipboardData(text: context.read<MainBloc>().state.roomCode);
+                              Clipboard.setData(data);
+                              ToastService.showToast(
+                                context,
+                                message: "Скопировано в буфер обмена.",
+                                shadowColor: Colors.black
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.only(left: 36, bottom: 36),
+                child: WaveButton(
+                  backgroundColor: Colors.white,
+                  child: const Text("Вернуться",
+                      style: TextStyle(
+                        fontFamily: 'Montserrat',
+                        color: Colors.black,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold
+                      )),
+                  onPressed: () {},
+                ),
+              )
+            ],
+          ),
         );
       case AppStatus.room:
         return Center(
@@ -165,15 +259,20 @@ class MainViewState extends State<MainView> {
                       );
                     },
                   ),
-/*                  Padding(
+                  Padding(
                     padding: const EdgeInsets.only(left: 8),
                     child: WaveButton(
                       child: const Icon(Icons.qr_code_scanner, color: Colors.white,),
-                      onPressed: () async{
-
+                      onPressed: () async {
+      /*                  FlutterBarcodeScanner.getBarcodeStreamReceiver("#ff6666", "Cancel", false, ScanMode.DEFAULT)
+                            ?.listen((barcode) {
+                          context.read<MainBloc>().add(
+                              StartScreenSharing(barcode)
+                          );
+                        });*/
                       },
                     ),
-                  ),*/
+                  ),
                 ],
               ),
             ),
