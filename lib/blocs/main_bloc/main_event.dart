@@ -8,6 +8,10 @@ final class InitializeConnection extends MainEvent {
   const InitializeConnection();
 }
 
+final class DisposeEvent extends MainEvent {
+  const DisposeEvent();
+}
+
 final class SendScreenshot extends MainEvent {
   final Uint8List screenshotChunk;
   const SendScreenshot(this.screenshotChunk);
@@ -22,6 +26,10 @@ final class SetScreenshotCallback extends MainEvent {
   SetScreenshotCallback();
 }
 
+final class RemoteCommand extends MainEvent {
+  final String command;
+  const RemoteCommand(this.command);
+}
 
 final class StartScreenSharing extends MainEvent {
   final String roomCode;
@@ -38,4 +46,9 @@ final class CreateRoom extends MainEvent {
 
 final class ScanQrCode extends MainEvent {
   const ScanQrCode();
+}
+
+
+final class NextEvent extends MainEvent {
+  const NextEvent();
 }

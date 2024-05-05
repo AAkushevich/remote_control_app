@@ -1,24 +1,16 @@
 package com.example.remote_control_app
 
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
-import android.service.controls.ControlsProviderService.TAG
-import android.util.Log
 import androidx.annotation.RequiresApi
 import com.example.remote_control_app.utils.MethodChannelSender
-
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
-import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
-import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.launch
 
 
 class MainActivity : FlutterActivity() {

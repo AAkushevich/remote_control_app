@@ -1,14 +1,12 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'package:remote_control_app/services/signaling.dart';
-import 'package:remote_control_app/utils/Logger.dart';
 import 'package:remote_control_app/blocs/main_bloc/main_event.dart';
 import 'package:remote_control_app/blocs/main_bloc/main_state.dart';
 import 'package:remote_control_app/repositories/api_repository.dart';
 import 'package:remote_control_app/repositories/socket_repository.dart';
-import 'package:flutter/services.dart';
-import 'dart:typed_data';
-
+import 'package:remote_control_app/services/signaling.dart';
+import 'package:remote_control_app/utils/Logger.dart';
 import 'package:remote_control_app/utils/constant_values.dart';
 
 class MainBloc extends Bloc<MainEvent, MainState> {
@@ -37,10 +35,13 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     on<StartScreenSharing>(_startScreenSharing);
     on<StopScreenSharing>(_stopScreenSharing);
     on<CreateRoom>(_createRoom);
+    on<DisposeEvent>(_dispose);
+    on<RemoteCommand>(_sendCommand);
+    on<NextEvent>(_next);
   }
 
   void clientConnectedEvent() {
-    if(WebRTC.platformIsWindows && state.desktopStatus != AppStatus.room) {
+    if(WebRTC.platformIsWindows && state.desktopStatus == AppStatus.joinRoom) {
       emit(state.copyWith(
         desktopStatus: AppStatus.room,
       ));
@@ -56,6 +57,12 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     });
   }
 
+  void _dispose(DisposeEvent event, Emitter<MainState> emit) async {
+    signaling.hangUp(remoteRenderer);
+    _localRenderer.dispose();
+    remoteRenderer.dispose();
+  }
+
   void _getScreenshot(SetScreenshotCallback event, Emitter<MainState> emit) async {
     _socketRepository.setScreenshotCallback(screenshotCallback);
   }
@@ -69,6 +76,10 @@ class MainBloc extends Bloc<MainEvent, MainState> {
 
   void _listenForScreenshots(ListenForScreenshots event, Emitter<MainState> emit) async {
 
+  }
+
+  void _sendCommand(RemoteCommand event, Emitter<MainState> emit) async {
+    signaling.sendCommand(event.command);
   }
 
   void _startScreenSharing(StartScreenSharing event, Emitter<MainState> emit) async {
@@ -88,7 +99,9 @@ class MainBloc extends Bloc<MainEvent, MainState> {
 
   void _stopScreenSharing(StopScreenSharing event, Emitter<MainState> emit) async {
     try {
+      signaling.hangUp(remoteRenderer);
       _localRenderer.dispose();
+      remoteRenderer.dispose();
       emit(state.copyWith(
           desktopStatus: AppStatus.main
       ));
@@ -109,5 +122,12 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     } on PlatformException catch (e) {
       Logger.Red.log("${e.message}.");
     }
+  }
+
+
+  void _next(NextEvent event, Emitter<MainState> emit) async {
+    emit(state.copyWith(
+      desktopStatus: AppStatus.room,
+    ));
   }
 }

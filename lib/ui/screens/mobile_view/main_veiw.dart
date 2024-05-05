@@ -1,18 +1,16 @@
 import 'dart:io';
-import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
-//import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
-
+import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:remote_control_app/blocs/main_bloc/main_bloc.dart';
 import 'package:remote_control_app/blocs/main_bloc/main_event.dart';
 import 'package:remote_control_app/blocs/main_bloc/main_state.dart';
 import 'package:remote_control_app/ui/widgets/wave_button.dart';
+import 'package:remote_control_app/utils/Logger.dart';
 import 'package:toasty_box/toast_service.dart';
 
 class MainView extends StatefulWidget {
@@ -39,6 +37,7 @@ class MainViewState extends State<MainView> {
 
   @override
   void dispose() {
+    context.read<MainBloc>().add(const DisposeEvent());
     super.dispose();
   }
 
@@ -63,10 +62,10 @@ class MainViewState extends State<MainView> {
     switch (context.read<MainBloc>().state.desktopStatus) {
       case AppStatus.main:
         return WaveButton(
+          backgroundColor: Colors.white,
           child: const Text("Создать комнату",
               style: TextStyle(
                 fontFamily: 'Montserrat',
-                color: Colors.white,
               )),
           onPressed: () {
             context.read<MainBloc>().add(const CreateRoom());
@@ -192,28 +191,72 @@ class MainViewState extends State<MainView> {
                   ),
                 ],
               ),
-              Padding(
-                padding: const EdgeInsets.only(left: 36, bottom: 36),
-                child: WaveButton(
-                  backgroundColor: Colors.white,
-                  child: const Text("Вернуться",
-                      style: TextStyle(
-                        fontFamily: 'Montserrat',
-                        color: Colors.black,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold
-                      )),
-                  onPressed: () {},
-                ),
-              )
+              Row(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(left: 36, bottom: 36),
+                    child: WaveButton(
+                      backgroundColor: Colors.white,
+                      child: const Text("Вернуться",
+                          style: TextStyle(
+                              fontFamily: 'Montserrat',
+                              color: Colors.black,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold
+                          )),
+                      onPressed: () {},
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 36, bottom: 36),
+                    child: WaveButton(
+                      backgroundColor: Colors.white,
+                      child: const Text("Next",
+                          style: TextStyle(
+                              fontFamily: 'Montserrat',
+                              color: Colors.black,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold
+                          )),
+                      onPressed: () {
+                        context.read<MainBloc>().add(
+                            const NextEvent()
+                        );
+                      },
+                    ),
+                  )
+                ],
+              ),
             ],
           ),
         );
       case AppStatus.room:
-        return Center(
-            child: RTCVideoView(
-                context.read<MainBloc>().remoteRenderer
+        return Stack(
+          children: [
+            Container(
+              alignment: Alignment.centerLeft,
+              height: MediaQuery.of(context).size.height * 0.9,
+              width: MediaQuery.of(context).size.width * 0.23,
+              padding: const EdgeInsets.all(10),
+              decoration: const BoxDecoration(
+                  color: Colors.black,
+                  borderRadius: BorderRadius.all(Radius.circular(20))
+              ),
+              child: GestureDetector(
+                child: RTCVideoView(
+                    context.read<MainBloc>().remoteRenderer
+                ),
+
+                onTapDown: (details) {
+                  context.read<MainBloc>().add(RemoteCommand(
+                      "GestureDetector details.globalPosition.dx: ${details.globalPosition.dx}, details.globalPosition.dy: ${details.globalPosition.dy}"
+                  ));
+                  /*Logger.Cyan.log("GestureDetector details.globalPosition.dx: ${details.globalPosition.dx}, details.globalPosition.dy: ${details.globalPosition.dy}");*/
+                },
+              ),
             )
+          ],
+            
         );
     }
   }
@@ -226,7 +269,7 @@ class MainViewState extends State<MainView> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Text("Введите код, чтобы подключиться к компьютеру."),
+            const Text("Введите код, чтобы подключиться к компьютеру.", style: TextStyle(color: Colors.white),),
             Padding(
               padding: const EdgeInsets.only(top: 96),
               child: SizedBox(
@@ -236,8 +279,11 @@ class MainViewState extends State<MainView> {
                   textAlign: TextAlign.start,
                   textAlignVertical: TextAlignVertical.center,
                   showCursor: true,
+
+                  style: const TextStyle(color: Colors.white),
                   decoration: const InputDecoration(
-                      hintText: "Введите код"
+                      hintText: "Введите код",
+                    hintStyle: TextStyle(color: Colors.white),
                   ),
                 ),
               ),
@@ -249,10 +295,8 @@ class MainViewState extends State<MainView> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   WaveButton(
-                    child: const Text("Присоедениться",
-                        style: TextStyle(
-                          color: Colors.white,
-                        )),
+                    backgroundColor: Colors.white,
+                    child: const Text("Присоедениться"),
                     onPressed: () {
                       context.read<MainBloc>().add(
                         StartScreenSharing(textController.text)
@@ -262,14 +306,13 @@ class MainViewState extends State<MainView> {
                   Padding(
                     padding: const EdgeInsets.only(left: 8),
                     child: WaveButton(
-                      child: const Icon(Icons.qr_code_scanner, color: Colors.white,),
+                      backgroundColor: Colors.white,
+                      child: const Icon(Icons.qr_code_scanner, color: Colors.black,),
                       onPressed: () async {
-      /*                  FlutterBarcodeScanner.getBarcodeStreamReceiver("#ff6666", "Cancel", false, ScanMode.DEFAULT)
-                            ?.listen((barcode) {
-                          context.read<MainBloc>().add(
-                              StartScreenSharing(barcode)
-                          );
-                        });*/
+                        String barcode = await FlutterBarcodeScanner.scanBarcode("#ff6666", "Отмена", false, ScanMode.QR);
+                        context.read<MainBloc>().add(
+                            StartScreenSharing(barcode)
+                        );
                       },
                     ),
                   ),

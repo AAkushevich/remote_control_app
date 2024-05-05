@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+
 import 'package:remote_control_app/services/socket_service.dart';
 
 class SocketRepository {

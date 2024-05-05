@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
-import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'dart:ui' as ui;
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:remote_control_app/ui/screens/mobile_view/main_veiw.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 class MobileView extends StatefulWidget {
   const MobileView({Key? key}) : super(key: key);
