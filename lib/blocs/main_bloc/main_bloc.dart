@@ -27,7 +27,7 @@ class MainBloc extends Bloc<MainEvent, MainState> {
       }) : _apiRepository = apiRepository,
         _socketRepository = socketRepository {
 
-    signaling = Signaling(clientConnectedEvent);
+    signaling = Signaling(clientConnectedEvent, commandRecieved);
 
     on<InitializeConnection>(_onInitializeConnection);
     on<SetScreenshotCallback>(_getScreenshot);
@@ -46,6 +46,10 @@ class MainBloc extends Bloc<MainEvent, MainState> {
         desktopStatus: AppStatus.room,
       ));
     }
+  }
+
+  void commandRecieved(String command) {
+
   }
 
   void _onInitializeConnection(InitializeConnection event, Emitter<MainState> emit) {

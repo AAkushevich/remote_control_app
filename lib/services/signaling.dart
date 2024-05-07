@@ -7,9 +7,9 @@ import 'package:remote_control_app/utils/Logger.dart';
 typedef StreamStateCallback = void Function(MediaStream stream);
 
 class Signaling {
-  Signaling(this.clientConnectedCallback);
+  Signaling(this.clientConnectedCallback, this.commandRecieved);
   Function() clientConnectedCallback;
-
+  Function(String command) commandRecieved;
   Map<String, dynamic> configuration = {
     'iceServers': [
       {
@@ -127,7 +127,15 @@ class Signaling {
     if (roomSnapshot.exists) {
       Logger.Green.log('Create PeerConnection with configuration: $configuration');
       peerConnection = await createPeerConnection(configuration);
-      initDataChannel();
+      peerConnection?.onDataChannel = (RTCDataChannel? channel) {
+        if (channel != null) {
+          // Set up event listeners for the data channel
+          channel.onMessage = (RTCDataChannelMessage message) {
+            Logger.Magenta.log(message.text);
+            commandRecieved(message.text);
+          };
+        }
+      };
       registerPeerConnectionListeners();
 
       localStream?.getTracks().forEach((track) {
@@ -239,26 +247,33 @@ class Signaling {
 
 
 
-
-  void  initDataChannel() async {
-/*    RTCDataChannelInit dataChannelInit = RTCDataChannelInit();
+  void initDataChannel() async {
+    RTCDataChannelInit dataChannelInit = RTCDataChannelInit();
     dataChannelInit.ordered = true;
 
     dataChannel = await peerConnection?.createDataChannel(
         'remote-control-channel',
         dataChannelInit);
 
+    dataChannel?.onDataChannelState = (RTCDataChannelState state) {
+      Logger.Magenta.log(state.toString());
+      dataChannel?.send(RTCDataChannelMessage("Initial data sent"));
+    };
+
     dataChannel?.onMessage = (RTCDataChannelMessage message) {
       Logger.Magenta.log(message.text);
-    };*/
-
-
+      commandRecieved(message.text);
+    };
   }
 
   void sendCommand(String data) {
-    /*dataChannel?.send(RTCDataChannelMessage(data.toString()));*/
+    if (dataChannel != null) {
+      Logger.Magenta.log("Sending command: $data");
+      dataChannel?.send(RTCDataChannelMessage(data));
+    } else {
+      Logger.Magenta.log("dataChannel is null");
+    }
   }
-
 
 
 
