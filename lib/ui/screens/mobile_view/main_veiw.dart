@@ -4,11 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_chat_bubble/chat_bubble.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:remote_control_app/blocs/main_bloc/main_bloc.dart';
 import 'package:remote_control_app/blocs/main_bloc/main_event.dart';
 import 'package:remote_control_app/blocs/main_bloc/main_state.dart';
+import 'package:remote_control_app/models/Command.dart';
+import 'package:remote_control_app/models/Message.dart';
 import 'package:remote_control_app/ui/widgets/wave_button.dart';
 import 'package:remote_control_app/utils/Logger.dart';
 import 'package:toasty_box/toast_service.dart';
@@ -23,11 +26,11 @@ class MainView extends StatefulWidget {
 class MainViewState extends State<MainView> {
 
   TextEditingController textController = TextEditingController();
+  TextEditingController chatTextController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-
     context.read<MainBloc>().add(const InitializeConnection());
 
     if (Platform.isWindows) {
@@ -43,6 +46,9 @@ class MainViewState extends State<MainView> {
 
   @override
   Widget build(BuildContext context) {
+    double height = MediaQuery.of(context).size.height;
+    double width = MediaQuery.of(context).size.width;
+
     return BlocConsumer<MainBloc, MainState>(
       listener: (context, state) {},
       builder: (BuildContext context, MainState state) {
@@ -53,12 +59,15 @@ class MainViewState extends State<MainView> {
                 Center(child: displayDesktopView())
                 :  Center(child: displayMobileView()),
           ),
+
         );
       },
     );
   }
 
   Widget displayDesktopView() {
+    double emulatedScreenHeight = MediaQuery.of(context).size.height * 0.9,
+        emulatedScreenWidth = MediaQuery.of(context).size.width * 0.23;
     switch (context.read<MainBloc>().state.desktopStatus) {
       case AppStatus.main:
         return WaveButton(
@@ -72,7 +81,6 @@ class MainViewState extends State<MainView> {
           },
         );
       case AppStatus.joinRoom:
-
         return Container(
           width: MediaQuery.of(context).size.width,
           height: MediaQuery.of(context).size.height,
@@ -173,7 +181,6 @@ class MainViewState extends State<MainView> {
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: WaveButton(
-                            child: const Icon(Icons.copy, color: Colors.black,),
                             backgroundColor: Colors.white,
                             onPressed: () {
                               final data = ClipboardData(text: context.read<MainBloc>().state.roomCode);
@@ -184,6 +191,7 @@ class MainViewState extends State<MainView> {
                                 shadowColor: Colors.black
                               );
                             },
+                            child: const Icon(Icons.copy, color: Colors.black),
                           ),
                         ),
                       ],
@@ -220,8 +228,7 @@ class MainViewState extends State<MainView> {
                           )),
                       onPressed: () {
                         context.read<MainBloc>().add(
-                            const NextEvent()
-                        );
+                            const NextEvent());
                       },
                     ),
                   )
@@ -231,12 +238,128 @@ class MainViewState extends State<MainView> {
           ),
         );
       case AppStatus.room:
-        return Stack(
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             Container(
-              alignment: Alignment.centerLeft,
-              height: MediaQuery.of(context).size.height * 0.9,
-              width: MediaQuery.of(context).size.width * 0.23,
+              height: emulatedScreenHeight,
+              width: emulatedScreenWidth,
+              padding: const EdgeInsets.all(10),
+              decoration: const BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.all(Radius.circular(20))
+              ),
+              child: Stack(
+                children: [
+                  ListView.builder(
+                      itemCount: context.read<MainBloc>().state.messages.length,
+                      itemBuilder: (BuildContext buildContext, int counter) {
+                        return ChatBubble(
+                          clipper: ChatBubbleClipper7(
+                              type: context.read<MainBloc>().state.messages[counter].sender == 'pc'
+                                  ? BubbleType.sendBubble
+                                  : BubbleType.receiverBubble
+                          ),
+                          alignment: context.read<MainBloc>().state.messages[counter].sender == 'pc'
+                            ? Alignment.topRight
+                            : Alignment.topLeft,
+                          margin: const EdgeInsets.only(top: 20),
+                          backGroundColor: context.read<MainBloc>().state.messages[counter].sender == 'pc'
+                              ? Colors.indigo
+                              : Colors.deepPurple,
+                          child: Container(
+                            constraints: BoxConstraints(
+                              maxWidth: MediaQuery.of(context).size.width * 0.7,
+                            ),
+                            child: Text(
+                                context.read<MainBloc>().state.messages[counter].text,
+                                style: const TextStyle(color: Colors.white),
+                            ),
+                          ),
+                        );
+                      }
+                  ),
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: emulatedScreenWidth * 0.8,
+                          child: TextField(
+                            cursorColor: Colors.white,
+                            controller: chatTextController,
+                            textAlign: TextAlign.start,
+                            textAlignVertical: TextAlignVertical.center,
+                            showCursor: true,
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                        ),
+                        SizedBox(
+                          width: emulatedScreenWidth * 0.10,
+                          child: IconButton(
+                            icon: const Icon(Icons.send, color: Colors.white,),
+                            onPressed: () {
+                              context.read<MainBloc>().add(
+                                  SendMessage(
+                                      Message(chatTextController.text, "pc")
+                                  )
+                              );
+                            },
+                          ),
+                        )
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            Container(
+              height: emulatedScreenHeight,
+              width: emulatedScreenWidth,
+              padding: const EdgeInsets.only(top: 40),
+              decoration: const BoxDecoration(
+                  color: Colors.black,
+                  borderRadius: BorderRadius.all(Radius.circular(10))
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(left: 14.0),
+                    child: Text("${context.read<MainBloc>().state.deviceInfo.manufacturer} ${context.read<MainBloc>().state.deviceInfo.model}",
+                      style: const TextStyle(color: Colors.white, fontSize: 25, fontFamily: 'Montserrat')
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 14.0, left: 14.0),
+                    child: Text("Device: ${context.read<MainBloc>().state.deviceInfo.device}",
+                        style: const TextStyle(color: Colors.white, fontSize: 15, fontFamily: 'Montserrat',)),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 14.0, left: 14.0),
+                    child: Text("Android version: ${context.read<MainBloc>().state.deviceInfo.androidVersion}",
+                        style: const TextStyle(color: Colors.white, fontSize: 15, fontFamily: 'Montserrat',)),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 14.0, left: 14.0),
+                    child: Text("Hardware: ${context.read<MainBloc>().state.deviceInfo.hardware}",
+                        style: const TextStyle(color: Colors.white, fontSize: 15, fontFamily: 'Montserrat',)),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 14.0, left: 14.0),
+                    child: Text("Display: ${context.read<MainBloc>().state.deviceInfo.display}",
+                        style: const TextStyle(color: Colors.white, fontSize: 15, fontFamily: 'Montserrat',)),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              alignment: Alignment.centerRight,
+              height: emulatedScreenHeight,
+              width: emulatedScreenWidth,
               padding: const EdgeInsets.all(10),
               decoration: const BoxDecoration(
                   color: Colors.black,
@@ -246,12 +369,29 @@ class MainViewState extends State<MainView> {
                 child: RTCVideoView(
                     context.read<MainBloc>().remoteRenderer
                 ),
-
                 onTapDown: (details) {
-                  context.read<MainBloc>().add(RemoteCommand(
-                      "GestureDetector details.globalPosition.dx: ${details.globalPosition.dx}, details.globalPosition.dy: ${details.globalPosition.dy}"
-                  ));
-                  /*Logger.Cyan.log("GestureDetector details.globalPosition.dx: ${details.globalPosition.dx}, details.globalPosition.dy: ${details.globalPosition.dy}");*/
+                  context.read<MainBloc>().add(
+                      PerformTouch(Coords(
+                          details.localPosition.dx / emulatedScreenWidth,
+                          details.localPosition.dy / emulatedScreenHeight))
+                  );
+                },
+                onPanStart: (details) {
+                  context.read<MainBloc>().add(
+                      StartSwipe(Coords(
+                          details.localPosition.dx / emulatedScreenWidth,
+                          details.localPosition.dy / emulatedScreenHeight)
+                      ));
+                },
+                onPanUpdate: (details) {
+                  context.read<MainBloc>().add(
+                      UpdateSwipe(Coords(
+                          details.localPosition.dx / emulatedScreenWidth,
+                          details.localPosition.dy / emulatedScreenHeight)
+                      ));
+                },
+                onPanEnd: (details) {
+                  context.read<MainBloc>().add(const EndSwipe());
                 },
               ),
             )
@@ -262,6 +402,7 @@ class MainViewState extends State<MainView> {
   }
 
   Widget displayMobileView() {
+
     switch (context.read<MainBloc>().state.desktopStatus) {
       case AppStatus.main:
         return Column(
@@ -298,9 +439,12 @@ class MainViewState extends State<MainView> {
                     backgroundColor: Colors.white,
                     child: const Text("Присоедениться"),
                     onPressed: () {
-                      context.read<MainBloc>().add(
-                        StartScreenSharing(textController.text)
-                      );
+                      _showAccessibilityDialog(context);
+                      if(textController.text.isNotEmpty) {
+                        context.read<MainBloc>().add(
+                          StartScreenSharing(textController.text)
+                        );
+                      }
                     },
                   ),
                   Padding(
@@ -309,6 +453,7 @@ class MainViewState extends State<MainView> {
                       backgroundColor: Colors.white,
                       child: const Icon(Icons.qr_code_scanner, color: Colors.black,),
                       onPressed: () async {
+                        _showAccessibilityDialog(context);
                         String barcode = await FlutterBarcodeScanner.scanBarcode("#ff6666", "Отмена", false, ScanMode.QR);
                         context.read<MainBloc>().add(
                             StartScreenSharing(barcode)
@@ -324,20 +469,216 @@ class MainViewState extends State<MainView> {
       case AppStatus.joinRoom:
         return Container();
       case AppStatus.room:
-        return Center(
-          child: WaveButton(
-            child: const Text("Остановить трансляцию",
-                style: TextStyle(
-                  color: Colors.white,
-                )),
-            onPressed: () {
-              context.read<MainBloc>().add(
-                  const StopScreenSharing()
-              );
-            },
-          )
+        return Stack(
+          children: [
+            ListView.builder(
+                itemCount: context.read<MainBloc>().state.messages.length,
+                itemBuilder: (BuildContext buildContext, int counter) {
+                  return ChatBubble(
+                    clipper: ChatBubbleClipper7(
+                        type: context.read<MainBloc>().state.messages[counter].sender == 'pc'
+                            ? BubbleType.sendBubble
+                            : BubbleType.receiverBubble
+                    ),
+                    alignment: context.read<MainBloc>().state.messages[counter].sender == 'pc'
+                        ? Alignment.topLeft
+                        : Alignment.topRight,
+                    margin: const EdgeInsets.only(top: 20),
+                    backGroundColor: context.read<MainBloc>().state.messages[counter].sender == 'pc'
+                        ? Colors.indigo
+                        : Colors.deepPurple,
+                    child: Container(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.7,
+                      ),
+                      child: Text(
+                        context.read<MainBloc>().state.messages[counter].text,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  );
+                }
+            ),
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 18.0),
+                child: Container(
+                  width: MediaQuery.of(context).size.width * 0.95,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20.0)
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: MediaQuery.of(context).size.width * 0.8,
+                        child: TextField(
+                          cursorColor: Colors.black,
+                          controller: chatTextController,
+                          textAlign: TextAlign.start,
+                          textAlignVertical: TextAlignVertical.center,
+                          showCursor: true,
+                          style: const TextStyle(color: Colors.black),
+                          decoration: const InputDecoration(
+                            hintText: 'Enter your message',
+                            border: InputBorder.none,
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: MediaQuery.of(context).size.width * 0.1,
+                        child: IconButton(
+                          icon: const Icon(Icons.send, color: Colors.black,),
+                          onPressed: () {
+                            context.read<MainBloc>().add(
+                                SendMessage(
+                                    Message(chatTextController.text, "mobile")
+                                )
+                            );
+                          },
+
+                        ),
+                      )
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Align(
+                alignment: Alignment.topRight,
+                child: Stack(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 24.0, right: 16.0),
+                      child: ElevatedButton(
+                        onPressed: () {
+                          context.read<MainBloc>().add(
+                              const StopScreenSharing()
+                          );
+                        },
+                        style: ButtonStyle(
+                          shape: MaterialStateProperty.all(const CircleBorder()),
+                          padding: MaterialStateProperty.all(const EdgeInsets.all(20)),
+                          backgroundColor: MaterialStateProperty.all(Colors.white), // <-- Button color
+                        ),
+                        child: const Icon(Icons.stop_rounded, color: Colors.red),
+                      ),
+                    ),
+                  ],
+                )
+            ),
+          ],
         );
     }
   }
+
+  Future<void> _showAccessibilityDialog(BuildContext context) async {
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Accessibility Permission Required',
+              style: TextStyle(
+                  fontFamily: 'Montserrat',
+                  color: Colors.white
+              )),
+          content: const Text(
+              'For the application to work correctly, you must provide the following permission. Settings > Accessibility > remote_control_app.',
+              style: TextStyle(
+                  fontFamily: 'Montserrat',
+                  color: Colors.white
+              )),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Ok', style: TextStyle(
+                  fontFamily: 'Montserrat',
+                  color: Colors.white
+              )),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+
+          ],
+        );
+      },
+    );
+  }
+
+  void showChatDialog(BuildContext mContext) {   /// Контекстов дохуя - толку нихуя
+    showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return Stack(
+            children: [
+              SizedBox(
+                width: 150,
+                child: ListView.builder(
+                    itemCount: mContext.read<MainBloc>().state.messages.length,
+                    itemBuilder: (BuildContext buildContext, int counter) {
+                      return ChatBubble(
+                        clipper: ChatBubbleClipper7(
+                            type: mContext.read<MainBloc>().state.messages[counter].sender == 'pc'
+                                ? BubbleType.sendBubble
+                                : BubbleType.receiverBubble
+                        ),
+                        alignment: Alignment.topRight,
+                        margin: const EdgeInsets.only(top: 20),
+                        backGroundColor: mContext.read<MainBloc>().state.messages[counter].sender == 'pc'
+                            ? Colors.indigo
+                            : Colors.purple,
+                        child: Container(
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.of(mContext).size.width * 0.7,
+                          ),
+                          child: Text(
+                            mContext.read<MainBloc>().state.messages[counter].text,
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                        ),
+                      );
+                    }
+                ),
+              ),
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: SizedBox(
+                  width: 150,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      TextField(
+                        cursorColor: Colors.white,
+                        controller: chatTextController,
+                        textAlign: TextAlign.start,
+                        textAlignVertical: TextAlignVertical.center,
+                        showCursor: true,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.send, color: Colors.white,),
+                        onPressed: () {
+                          mContext.read<MainBloc>().add(
+                              SendMessage(
+                                  Message(chatTextController.text, "pc")
+                              )
+                          );
+                        },
+
+                      )
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+    );
+  }
+
+
 
 }

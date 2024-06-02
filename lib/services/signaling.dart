@@ -2,14 +2,19 @@ import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:remote_control_app/models/Command.dart';
+import 'package:remote_control_app/models/DeviceInfo.dart';
+import 'package:remote_control_app/models/Message.dart';
 import 'package:remote_control_app/utils/Logger.dart';
 
 typedef StreamStateCallback = void Function(MediaStream stream);
 
 class Signaling {
-  Signaling(this.clientConnectedCallback, this.commandRecieved);
+  Signaling(this.clientConnectedCallback, this.commandReceived);
+
   Function() clientConnectedCallback;
-  Function(String command) commandRecieved;
+  Function(String command) commandReceived;
+
   Map<String, dynamic> configuration = {
     'iceServers': [
       {
@@ -27,13 +32,16 @@ class Signaling {
   String? roomId;
   String? currentRoomText;
   StreamStateCallback? onAddRemoteStream;
-  RTCDataChannel? dataChannel;
+  RTCDataChannel? remoteCommandChannel;
+  late DeviceInfo _deviceInfo;
 
-  Future<String> createRoom(RTCVideoRenderer remoteRenderer) async {                      // 1.createRoom
+  Future<String> createRoom(RTCVideoRenderer remoteRenderer) async {
+    // 1.createRoom
     FirebaseFirestore db = FirebaseFirestore.instance;
     DocumentReference roomRef = db.collection('rooms').doc();
 
-    Logger.Green.log('Create PeerConnection with configuration: $configuration');
+    Logger.Green.log(
+        'Create PeerConnection with configuration: $configuration');
 
     peerConnection = await createPeerConnection(configuration);
 
@@ -43,17 +51,15 @@ class Signaling {
       peerConnection?.addTrack(track, localStream!);
     });
 
-    // Code for collecting ICE candidates below
     var callerCandidatesCollection = roomRef.collection('callerCandidates');
 
     peerConnection?.onIceCandidate = (RTCIceCandidate candidate) {
       Logger.Green.log('Got candidate: ${candidate.toMap()}');
       callerCandidatesCollection.add(candidate.toMap());
     };
-    // Finish Code for collecting ICE candidate
-    initDataChannel();
 
-    // Add code for creating a room
+    initRemoteControlChannel();
+
     RTCSessionDescription offer = await peerConnection!.createOffer();
     await peerConnection!.setLocalDescription(offer);
     Logger.Green.log('Created offer: $offer');
@@ -64,7 +70,6 @@ class Signaling {
     var roomId = roomRef.id;
     Logger.Green.log('New room created with SDK offer. Room ID: $roomId');
     currentRoomText = 'Current room is $roomId - You are the caller!';
-    // Created a Room
 
     peerConnection?.onTrack = (RTCTrackEvent event) {
       clientConnectedCallback();
@@ -76,9 +81,9 @@ class Signaling {
       });
     };
 
-    // Listen for remote Ice candidates below
     roomRef.collection('calleeCandidates').snapshots().listen((snapshot) {
-      snapshot.docChanges.forEach((change) {
+      // Listen for remote Ice candidates below
+      for (var change in snapshot.docChanges) {
         if (change.type == DocumentChangeType.added) {
           Map<String, dynamic> data = change.doc.data() as Map<String, dynamic>;
           Logger.Green.log('Got new remote ICE candidate: ${jsonEncode(data)}');
@@ -90,12 +95,10 @@ class Signaling {
             ),
           );
         }
-      });
+      }
     });
 
-    // Listening for remote session description below
     roomRef.snapshots().listen((snapshot) async {
-
       Map<String, dynamic> data = snapshot.data() as Map<String, dynamic>;
       if (data['answer'] != null) {
         var answer = RTCSessionDescription(
@@ -103,36 +106,36 @@ class Signaling {
           data['answer']['type'],
         );
 
-
         Logger.Blue.log("Someone tried to connect");
         await peerConnection?.setRemoteDescription(answer);
         await peerConnection?.getRemoteDescription();
-
       }
     });
-    // Listening for remote session description above
-
-
-    // Listen for remote ICE candidates above
 
     return roomId;
   }
 
-  Future<void> joinRoom(String roomId, RTCVideoRenderer remoteVideo) async {                //2.joinRoom
+  Future<void> joinRoom(String roomId, RTCVideoRenderer remoteVideo) async {
+    //2.joinRoom
     FirebaseFirestore db = FirebaseFirestore.instance;
     DocumentReference roomRef = db.collection('rooms').doc(roomId);
     var roomSnapshot = await roomRef.get();
     Logger.Green.log('Got room ${roomSnapshot.exists}');
 
     if (roomSnapshot.exists) {
-      Logger.Green.log('Create PeerConnection with configuration: $configuration');
+      Logger.Green.log(
+          'Create PeerConnection with configuration: $configuration');
       peerConnection = await createPeerConnection(configuration);
       peerConnection?.onDataChannel = (RTCDataChannel? channel) {
         if (channel != null) {
-          // Set up event listeners for the data channel
+          remoteCommandChannel ??= channel;
+          remoteCommandChannel
+              ?.send(RTCDataChannelMessage("info:${_deviceInfo.toJson()}"));
+
           channel.onMessage = (RTCDataChannelMessage message) {
+            // Set up event listener for the data channel
             Logger.Magenta.log(message.text);
-            commandRecieved(message.text);
+            commandReceived(message.text);
           };
         }
       };
@@ -142,7 +145,6 @@ class Signaling {
         peerConnection?.addTrack(track, localStream!);
       });
 
-      // Code for collecting ICE candidates below
       var calleeCandidatesCollection = roomRef.collection('calleeCandidates');
       peerConnection!.onIceCandidate = (RTCIceCandidate? candidate) {
         if (candidate == null) {
@@ -152,19 +154,7 @@ class Signaling {
         Logger.Blue.log('onIceCandidate: ${candidate.toMap()}');
         calleeCandidatesCollection.add(candidate.toMap());
       };
-      // Code for collecting ICE candidate above
 
-
-/*      peerConnection?.onTrack = (RTCTrackEvent event) {
-        Logger.Green.log('Got remote track: ${event.streams[0]}');
-        event.streams[0].getTracks().forEach((track) {
-          Logger.Green.log('Add a track to the remoteStream: $track');
-          remoteStream?.addTrack(track);
-        });
-      };*/
-
-
-      // Code for creating SDP answer below
       var data = roomSnapshot.data() as Map<String, dynamic>;
       Logger.Blue.log('Got offer $data');
       var offer = data['offer'];
@@ -181,11 +171,9 @@ class Signaling {
       };
 
       await roomRef.update(roomWithAnswer);
-      // Finished creating SDP answer
 
-      // Listening for remote ICE candidates below
       roomRef.collection('callerCandidates').snapshots().listen((snapshot) {
-        snapshot.docChanges.forEach((document) {
+        for (var document in snapshot.docChanges) {
           var data = document.doc.data() as Map<String, dynamic>;
           Logger.Green.log("JOINED TO ROOM");
           Logger.Green.log('Got new remote ICE candidate: $data');
@@ -196,15 +184,15 @@ class Signaling {
               data['sdpMLineIndex'],
             ),
           );
-        });
+        }
       });
     }
   }
 
-  Future<void> openUserMedia(                                                       // 3.openUserMedia
+  Future<void> openUserMedia(
+      // 3.openUserMedia
       RTCVideoRenderer localVideo,
-      RTCVideoRenderer remoteVideo,
-      ) async {
+      RTCVideoRenderer remoteVideo) async {
     var stream = await navigator.mediaDevices.getDisplayMedia({
       'video': {
         'mediaSource': 'screen',
@@ -217,11 +205,12 @@ class Signaling {
     remoteVideo.srcObject = await createLocalMediaStream('key');
   }
 
-  Future<void> hangUp(RTCVideoRenderer localVideo) async {                          // 4. hangUp
+  Future<void> hangUp(RTCVideoRenderer localVideo) async {
+    // 4. hangUp
     List<MediaStreamTrack> tracks = localVideo.srcObject!.getTracks();
-    tracks.forEach((track) {
+    for (var track in tracks) {
       track.stop();
-    });
+    }
 
     if (remoteStream != null) {
       remoteStream!.getTracks().forEach((track) => track.stop());
@@ -232,10 +221,14 @@ class Signaling {
       var db = FirebaseFirestore.instance;
       var roomRef = db.collection('rooms').doc(roomId);
       var calleeCandidates = await roomRef.collection('calleeCandidates').get();
-      calleeCandidates.docs.forEach((document) => document.reference.delete());
+      for (var document in calleeCandidates.docs) {
+        document.reference.delete();
+      }
 
       var callerCandidates = await roomRef.collection('callerCandidates').get();
-      callerCandidates.docs.forEach((document) => document.reference.delete());
+      for (var document in callerCandidates.docs) {
+        document.reference.delete();
+      }
 
       await roomRef.delete();
     }
@@ -244,41 +237,47 @@ class Signaling {
     remoteStream?.dispose();
   }
 
-
-
-
-  void initDataChannel() async {
+  void initRemoteControlChannel() async {
     RTCDataChannelInit dataChannelInit = RTCDataChannelInit();
     dataChannelInit.ordered = true;
 
-    dataChannel = await peerConnection?.createDataChannel(
-        'remote-control-channel',
-        dataChannelInit);
+    remoteCommandChannel = await peerConnection?.createDataChannel(
+        'remote-control-channel', dataChannelInit);
 
-    dataChannel?.onDataChannelState = (RTCDataChannelState state) {
+    remoteCommandChannel?.onDataChannelState = (RTCDataChannelState state) {
       Logger.Magenta.log(state.toString());
-      dataChannel?.send(RTCDataChannelMessage("Initial data sent"));
     };
 
-    dataChannel?.onMessage = (RTCDataChannelMessage message) {
+    remoteCommandChannel?.onMessage = (RTCDataChannelMessage message) {
       Logger.Magenta.log(message.text);
-      commandRecieved(message.text);
+      commandReceived(message.text);
     };
   }
 
-  void sendCommand(String data) {
-    if (dataChannel != null) {
-      Logger.Magenta.log("Sending command: $data");
-      dataChannel?.send(RTCDataChannelMessage(data));
+  void sendRemoteControlCommand(Command command) {
+    if (remoteCommandChannel != null) {
+      remoteCommandChannel
+          ?.send(RTCDataChannelMessage("command:${command.toJson()}"));
     } else {
       Logger.Magenta.log("dataChannel is null");
     }
   }
 
+  void sendDeviceInfo(DeviceInfo deviceInfo) {
+    _deviceInfo = deviceInfo;
+  }
 
+  void sendMessageToRemoteDevice(Message message) {
+    if (remoteCommandChannel != null) {
+      remoteCommandChannel
+          ?.send(RTCDataChannelMessage("message:${message.toJson()}"));
+    } else {
+      Logger.Magenta.log("dataChannel is null");
+    }
+  }
 
-
-  void registerPeerConnectionListeners() {                                          // 5.registerPeerConnectionListeners
+  void registerPeerConnectionListeners() {
+    // 5.registerPeerConnectionListeners
 
     peerConnection?.onIceGatheringState = (RTCIceGatheringState state) {
       Logger.Magenta.log('TRIGGERRED onIceGatheringState ');
@@ -293,7 +292,6 @@ class Signaling {
     peerConnection?.onSignalingState = (RTCSignalingState state) {
       Logger.Magenta.log('TRIGGERRED onSignalingState');
       Logger.Blue.log('Signaling state change: $state');
-
     };
 
     peerConnection?.onIceGatheringState = (RTCIceGatheringState state) {
