@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -7,7 +8,8 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:remote_control_app/blocs/main_bloc/main_bloc.dart';
 import 'package:remote_control_app/blocs/main_bloc/main_state.dart';
 import 'package:remote_control_app/models/DeviceInfo.dart';
-import 'package:remote_control_app/ui/screens/mobile_view/main_veiw.dart';
+import 'package:remote_control_app/ui/screens/DesktopView.dart';
+import 'package:remote_control_app/ui/screens/MobileView.dart';
 
 class App extends StatelessWidget {
   const App({Key? key}) : super(key: key);
@@ -36,7 +38,11 @@ class AppView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-        child: const MainView(),
+        child: Center(
+          child: Platform.isWindows
+              ? DesktopView()
+              :  MobileView(),
+        ),
         create: (_) =>
             MainBloc(
                 MainState(

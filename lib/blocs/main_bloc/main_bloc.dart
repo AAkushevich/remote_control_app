@@ -32,10 +32,12 @@ class MainBloc extends Bloc<MainEvent, MainState> {
   static final DeviceInfoPlugin deviceInfoPlugin = DeviceInfoPlugin();
 
   MainBloc(super.initialState) {
+    if(Platform.isAndroid) {
+      getDeviceInfo();
+    }
     signaling = Signaling(clientConnectedEvent, messageReceived);
 
     on<InitializeConnection>(_onInitializeConnection);
-    on<ListenForScreenshots>(_listenForScreenshots);
     on<StartScreenSharing>(_startScreenSharing);
     on<StopScreenSharing>(_stopScreenSharing);
     on<CreateRoom>(_createRoom);
@@ -93,9 +95,7 @@ class MainBloc extends Bloc<MainEvent, MainState> {
   }
 
     void _onInitializeConnection(InitializeConnection event, Emitter<MainState> emit) {
-      if(Platform.isAndroid) {
-        getDeviceInfo();
-      }
+
       _localRenderer.initialize();
       remoteRenderer.initialize();
 
@@ -115,10 +115,6 @@ class MainBloc extends Bloc<MainEvent, MainState> {
           screenShareStatus: ScreenShareStatus.displayScreenshot,
           screenshotBytes: screenshotData
       ));
-    }
-
-    void _listenForScreenshots(ListenForScreenshots event,
-        Emitter<MainState> emit) async {
     }
 
     void _sendDeviceInfo() {
