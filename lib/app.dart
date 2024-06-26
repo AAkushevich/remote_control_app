@@ -28,6 +28,7 @@ class App extends StatelessWidget {
         create: (context) => AppBloc(),
         child: const AppView(),
       ),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
@@ -49,7 +50,7 @@ class AppView extends StatelessWidget {
                   connectionStatus: ConnectionStatus.notConnected,
                   screenshotBytes: Uint8List(0),
                   remoteRenderer: RTCVideoRenderer(),
-                  deviceInfo: DeviceInfo("", "", "", "", "", ""),
+                  deviceInfo: DeviceInfo("", "", "", "", "", "", "", "", "", 0),
                   messages: []
                 ),
             )

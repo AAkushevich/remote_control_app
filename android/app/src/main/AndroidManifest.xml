@@ -19,7 +19,7 @@
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
 
     <application
-        android:label="remote_control_app"
+        android:label="Phone Commander"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true">
@@ -43,7 +43,7 @@
         </activity>
 
         <service
-            android:name="MyAccessibilityService"
+            android:name="RemoteControlService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             android:exported="false">
                 <intent-filter>

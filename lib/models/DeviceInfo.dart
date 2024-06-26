@@ -3,19 +3,36 @@ class DeviceInfo {
   String model;
   String manufacturer;
   String androidVersion;
-  String hardware;
-  String display;
+  String totalMemory;
+  String usedMemory;
+  String buildNumber;
+  String processorName;
+  String processorManufacturer;
+  int apiLevel;
 
   DeviceInfo(
-      this.device, this.model, this.manufacturer, this.androidVersion, this.hardware, this.display);
+      this.device,
+      this.model,
+      this.manufacturer,
+      this.androidVersion,
+      this.totalMemory,
+      this.usedMemory,
+      this.buildNumber,
+      this.processorName,
+      this.processorManufacturer,
+      this.apiLevel);
 
   DeviceInfo.fromJson(Map<String, dynamic> json)
       : device = json['device'],
         model = json['model'],
         manufacturer = json['manufacturer'],
         androidVersion = json['androidVersion'].toString(),
-        hardware = json['hardware'],
-        display = json['display'];
+        totalMemory = json['totalMemory'].toString(),
+        usedMemory = json['usedMemory'].toString(),
+        buildNumber = json['buildNumber'].toString(),
+        processorName = json['processorName'] ?? "Unknown",
+        processorManufacturer = json['processorManufacturer'] ?? "Unknown",
+        apiLevel = json['apiLevel'] != null ? json['apiLevel'].toInt() : 0;
 
   Map<String, dynamic> toJson() {
     return {
@@ -23,8 +40,12 @@ class DeviceInfo {
       'model': model,
       'manufacturer': manufacturer,
       'androidVersion': androidVersion,
-      'hardware': hardware,
-      'display': display,
+      'totalMemory': totalMemory,
+      'usedMemory': usedMemory,
+      'buildNumber': buildNumber,
+      'processorName': processorName,
+      'processorManufacturer': processorManufacturer,
+      'apiLevel': apiLevel,
     };
   }
 }

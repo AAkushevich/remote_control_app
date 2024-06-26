@@ -46,6 +46,9 @@ final class ScanQrCode extends MainEvent {
   const ScanQrCode();
 }
 
+final class CancelConnection extends MainEvent {
+  const CancelConnection();
+}
 
 final class NextEvent extends MainEvent {
   const NextEvent();

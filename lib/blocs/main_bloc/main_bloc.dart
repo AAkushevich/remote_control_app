@@ -1,5 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
-
+import 'package:flutter_storage_info/flutter_storage_info.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:io';
 import 'package:flutter/services.dart';
@@ -10,23 +11,28 @@ import 'package:remote_control_app/blocs/main_bloc/main_state.dart';
 import 'package:remote_control_app/models/Command.dart';
 import 'package:remote_control_app/models/DeviceInfo.dart';
 import 'package:remote_control_app/models/Message.dart';
-import 'package:remote_control_app/services/signaling.dart';
+import 'package:remote_control_app/services/webrtc_service.dart';
 import 'package:remote_control_app/utils/Logger.dart';
 import 'package:remote_control_app/utils/constant_values.dart';
+import 'package:system_info/system_info.dart';
 
 class MainBloc extends Bloc<MainEvent, MainState> {
 
   late MethodChannel methodChannel =
-  const MethodChannel(ConstantValues.methodChannelName);
+  const MethodChannel(ConstantValues.remoteGestureChannel);
   Uint8List? screenshotData = Uint8List(0);
-  late Signaling signaling;
+  late WebRTCService signaling;
   final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
   RTCVideoRenderer remoteRenderer = RTCVideoRenderer();
+  final Completer<void> _remoteStreamAddedCompleter = Completer<void>();
+  bool _isFirstStreamAdded = false;
   late Coords startSwipeCoords;
   late Coords updateSwipeCoords;
   late AndroidDeviceInfo androidInfo;
   late DeviceInfo deviceInfo;
   late List<Message> messages = [];
+  late int renderScreenHeight;
+  late int renderScreenWidth;
   String? roomId;
 
   static final DeviceInfoPlugin deviceInfoPlugin = DeviceInfoPlugin();
@@ -35,39 +41,62 @@ class MainBloc extends Bloc<MainEvent, MainState> {
     if(Platform.isAndroid) {
       getDeviceInfo();
     }
-    signaling = Signaling(clientConnectedEvent, messageReceived);
+
+    signaling = WebRTCService(clientConnectedEvent, connectionCanceledEvent, messageReceived);
 
     on<InitializeConnection>(_onInitializeConnection);
     on<StartScreenSharing>(_startScreenSharing);
     on<StopScreenSharing>(_stopScreenSharing);
+    on<CancelConnection>(_cancelConnection);
     on<CreateRoom>(_createRoom);
     on<DisposeEvent>(_dispose);
     on<PerformTouch>(_performTouch);
     on<StartSwipe>(_startSwipe);
     on<UpdateSwipe>(_updateSwipe);
     on<EndSwipe>(_endSwipe);
-    on<NextEvent>(_next);
     on<SendMessage>(_sendMessage);
   }
 
+  void _cancelConnection(CancelConnection event, Emitter<MainState> emit) {
+    roomId = "";
+
+    signaling.localStream?.dispose();
+    signaling.remoteStream?.dispose();
+    signaling.peerConnection?.close();
+    emit(state.copyWith(desktopStatus: AppStatus.main));
+  }
+
+  void connectionCanceledEvent() {
+    signaling.hangUp(remoteRenderer);
+
+    emit(state.copyWith(
+        desktopStatus: AppStatus.main
+    ));
+  }
+
   void clientConnectedEvent() {
-    if (WebRTC.platformIsWindows && state.desktopStatus == AppStatus.joinRoom) {
-      emit(state.copyWith(
-        desktopStatus: AppStatus.room,
-      ));
-    }
+    performActionAfterRemoteStreamAdded().then((_) {
+      emit(state.copyWith(desktopStatus: AppStatus.room));
+    });
   }
 
   Future<void> getDeviceInfo() async {
     androidInfo = await deviceInfoPlugin.androidInfo;
+
+    double totalSpace = await FlutterStorageInfo.getStorageTotalSpaceInGB;
+    double usedSpace = await FlutterStorageInfo.getStorageUsedSpaceInGB;
 
     deviceInfo = DeviceInfo(
       androidInfo.device,
       androidInfo.model,
       androidInfo.manufacturer,
       androidInfo.version.release,
-      androidInfo.hardware,
-      androidInfo.display
+      totalSpace.toStringAsFixed(2),
+      usedSpace.toStringAsFixed(2),
+      androidInfo.version.incremental,
+      SysInfo.processors.first.name,
+      SysInfo.processors.first.vendor,
+      androidInfo.version.sdkInt
     );
   }
 
@@ -101,8 +130,23 @@ class MainBloc extends Bloc<MainEvent, MainState> {
 
       signaling.onAddRemoteStream = ((stream) {
         remoteRenderer.srcObject = stream;
+        remoteRenderer.onResize = () {
+          if (state.desktopStatus == AppStatus.joinRoom) {
+            if (!_isFirstStreamAdded) {
+              renderScreenHeight = remoteRenderer.videoHeight;
+              renderScreenWidth = remoteRenderer.videoWidth;
+              _isFirstStreamAdded = true;
+              _remoteStreamAddedCompleter.complete();
+            }
+          }
+        };
       });
     }
+
+
+  Future<void> performActionAfterRemoteStreamAdded() async {
+    await _remoteStreamAddedCompleter.future;
+  }
 
     void _dispose(DisposeEvent event, Emitter<MainState> emit) async {
       signaling.hangUp(remoteRenderer);
@@ -169,8 +213,8 @@ class MainBloc extends Bloc<MainEvent, MainState> {
         Emitter<MainState> emit) async {
       try {
         signaling.hangUp(remoteRenderer);
-        _localRenderer.dispose();
-        remoteRenderer.dispose();
+      /*  _localRenderer.dispose();
+        remoteRenderer.dispose();*/
         emit(state.copyWith(
             desktopStatus: AppStatus.main
         ));
